@@ -128,7 +128,7 @@
   <div class="card" id="resultCard" style="display:none">
     <table id="resultTable">
       <thead><tr>
-        <th>条</th><th>見出し</th><th>判定</th><th>更新内容</th><th>現行施行日</th>
+        <th>条</th><th>見出し</th><th>判定</th><th>更新内容</th><th>最終改正日</th>
       </tr></thead>
       <tbody></tbody>
     </table>
@@ -245,6 +245,9 @@ async function checkArticle(lawId, elm, since, enforced){
   const cur=await getArticle(lawId, elm); // 現行
   const row={elm, label:elmToLabel(elm), caption:cur.caption, text:cur.text, enforcementDate:cur.enforcementDate};
 
+  // その条が最後に改正された日（履歴をさかのぼって特定）
+  row.lastAmended=await findLastAmended(lawId, elm, enforced, cur.hash);
+
   // since 時点の基準リビジョン（since以前で最新の施行）
   const baseRev=enforced.find(r=>(r.amendment_enforcement_date||"")<=since) || enforced[enforced.length-1];
   let baseHash;
@@ -265,6 +268,20 @@ async function checkArticle(lawId, elm, since, enforced){
   if(!events.length) events.push({date:cur.enforcementDate, title:"改正あり（詳細は原文をご確認ください）"});
   row.events=events;
   return row;
+}
+
+// 現行から履歴を新しい順にさかのぼり、その条が最後に変わった施行日を返す
+async function findLastAmended(lawId, elm, enforced, currentHash){
+  let prev=currentHash;
+  for(let i=1;i<enforced.length;i++){
+    let h;
+    try{ h=(await getArticle(enforced[i].law_revision_id, elm)).hash; }
+    catch(e){ return {date:enforced[i-1].amendment_enforcement_date, note:"新設"}; }
+    if(h!==prev) return {date:enforced[i-1].amendment_enforcement_date};
+    prev=h;
+  }
+  const oldest=enforced[enforced.length-1];
+  return {date:oldest?oldest.amendment_enforcement_date:null, note:"収録範囲内で変更なし"};
 }
 
 function renderSummary(lawInfo, enforced, future, since){
@@ -298,18 +315,19 @@ function renderResults(results, since){
       <td class="cap">${esc(r.caption||"")}<details class="body"><summary></summary><pre>${esc((r.text||"").slice(0,1500))}</pre></details></td>
       <td>${judge}</td>
       <td>${content}</td>
-      <td>${esc(r.enforcementDate||"-")}</td>
+      <td>${r.lastAmended?`${esc(r.lastAmended.date||"-")}${r.lastAmended.note?`<br><span class="muted">${esc(r.lastAmended.note)}</span>`:""}`:"-"}</td>
     </tr>`;
   }).join("");
 }
 
 function exportCsv(){
   if(!lastResults) return;
-  const rows=[["条","見出し","判定","更新日","改正法","現行施行日"].join(",")];
+  const rows=[["条","見出し","判定","更新日","改正法","最終改正日"].join(",")];
   lastResults.results.forEach(r=>{
     if(r.__error){ rows.push(csv([r.label,"エラー:"+r.__error,"","","",""])); return; }
-    if(r.changed&&r.events){ r.events.forEach(e=>rows.push(csv([r.label,r.caption||"","更新あり",e.date,e.title,r.enforcementDate||""]))); }
-    else rows.push(csv([r.label,r.caption||"","更新なし","","",r.enforcementDate||""]));
+    const la=r.lastAmended?(r.lastAmended.date+(r.lastAmended.note?("／"+r.lastAmended.note):"")):"";
+    if(r.changed&&r.events){ r.events.forEach(e=>rows.push(csv([r.label,r.caption||"","更新あり",e.date,e.title,la]))); }
+    else rows.push(csv([r.label,r.caption||"","更新なし","","",la]));
   });
   const blob=new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);

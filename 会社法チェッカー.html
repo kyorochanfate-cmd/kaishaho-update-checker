@@ -110,7 +110,7 @@
     <div class="mt">
       <span class="label">チェックする条番号</span>
       <textarea id="articles" placeholder="2, 309, 331, 362, 847の2">2, 309, 331, 362</textarea>
-      <div class="hint">カンマか改行区切り。「第」「条」は省略可。枝番は「847の2」のように入力。</div>
+      <div class="hint">カンマか改行区切り。「第」「条」は省略可。「の」は枝番（例: 847の2）。※「項」単位は指定できません — 条番号だけ（例: 356）で入力すれば、その条の全項が対象になります。</div>
     </div>
     <div class="actions">
       <button class="btn-primary" id="runBtn">チェック</button>
@@ -288,7 +288,7 @@ function renderResults(results, since){
   const tb=$("resultTable").querySelector("tbody");
   if(!results.length){ tb.innerHTML=`<tr><td colspan="5" class="empty">該当なし</td></tr>`; return; }
   tb.innerHTML=results.map(r=>{
-    if(r.__error) return `<tr><td class="art">${esc(r.label||"?")}</td><td colspan="4"><span class="pill pill-err">エラー</span> <span class="muted">${esc(r.__error)}</span></td></tr>`;
+    if(r.__error){ const tip=/存在しません/.test(r.__error)?`<br><span class="muted">その条・枝番が見つかりません。「項」は指定できません。条番号だけ（例: 356）で入力してください。</span>`:""; return `<tr><td class="art">${esc(r.label||"?")}</td><td colspan="4"><span class="pill pill-err">エラー</span> <span class="muted">${esc(r.__error)}</span>${tip}</td></tr>`; }
     const judge=r.changed?`<span class="pill pill-changed">更新あり</span>`:`<span class="pill pill-same">更新なし</span>`;
     let content;
     if(r.changed&&r.events) content=`<ul class="ev">`+r.events.map(e=>`<li><span class="d">${esc(e.date)}</span> <span class="t">${esc(cut(e.title,42))}</span></li>`).join("")+`</ul>`;

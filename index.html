@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会社法 改正チェッカー</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#121212; --sub:#6b6b6b; --faint:#9a9a9a;
+    --line:#e6e6e6; --line2:#d4d4d4; --panel:#fafafa; --panel2:#f3f3f3;
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink)}
+  body{font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;
+       font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  main{max-width:920px;margin:0 auto;padding:48px 24px 80px}
+  .head{margin-bottom:36px}
+  .head h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em}
+  .head p{margin:8px 0 0;color:var(--sub);font-size:13px;max-width:640px}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:24px;margin-bottom:20px;background:var(--bg)}
+  .label{font-size:12px;font-weight:600;color:var(--sub);letter-spacing:.02em;margin-bottom:6px;display:block}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;
+       font-size:14px;font-family:inherit;color:var(--ink);background:var(--bg);outline:none}
+  input:focus,select:focus,textarea:focus{border-color:var(--ink)}
+  textarea{resize:vertical;min-height:64px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .mt{margin-top:16px}
+  .hint{font-size:12px;color:var(--faint);margin-top:6px}
+  .actions{display:flex;align-items:center;gap:12px;margin-top:20px;flex-wrap:wrap}
+  button{cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;border-radius:8px;padding:11px 20px;border:1px solid var(--ink)}
+  .btn-primary{background:var(--ink);color:#fff}
+  .btn-primary:hover{background:#000}
+  .btn-ghost{background:var(--bg);color:var(--ink);border-color:var(--line2)}
+  .btn-ghost:hover{border-color:var(--ink)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  #status{font-size:13px;color:var(--sub);margin-left:auto}
+  .bar{height:2px;background:var(--line);margin-top:18px;border-radius:2px;overflow:hidden;display:none}
+  .bar > i{display:block;height:100%;width:0;background:var(--ink);transition:width .25s}
+  /* law summary */
+  .summary{display:flex;gap:28px;flex-wrap:wrap;align-items:baseline}
+  .summary .item .k{font-size:11px;color:var(--faint);letter-spacing:.03em}
+  .summary .item .v{font-size:18px;font-weight:700;margin-top:2px}
+  .summary .item .v small{font-size:12px;font-weight:500;color:var(--sub)}
+  details.up{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+  details.up summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;list-style:none}
+  details.up summary::-webkit-details-marker{display:none}
+  details.up summary::before{content:"▸ ";color:var(--faint)}
+  details.up[open] summary::before{content:"▾ "}
+  details.up ul{margin:10px 0 0;padding-left:18px;color:var(--sub);font-size:13px}
+  details.up li{margin:3px 0}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--faint);letter-spacing:.03em;
+     padding:0 12px 10px;border-bottom:1px solid var(--line2)}
+  td{padding:14px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .art{font-weight:700;white-space:nowrap}
+  .cap{color:var(--sub)}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+  .pill-changed{background:var(--ink);color:#fff}
+  .pill-same{background:var(--bg);color:var(--sub);border:1px solid var(--line2)}
+  .pill-err{background:var(--bg);color:var(--ink);border:1px dashed var(--line2)}
+  .ev{margin:0;padding:0;list-style:none;font-size:12px}
+  .ev li{margin:2px 0}
+  .ev .d{font-weight:700}
+  .ev .t{color:var(--sub)}
+  .muted{color:var(--faint);font-size:12px}
+  details.body{margin-top:6px}
+  details.body summary{cursor:pointer;font-size:12px;color:var(--faint);list-style:none}
+  details.body summary::-webkit-details-marker{display:none}
+  details.body summary::before{content:"条文を表示"}
+  details.body[open] summary::before{content:"閉じる"}
+  details.body pre{white-space:pre-wrap;font-size:12px;background:var(--panel);border:1px solid var(--line);
+     padding:10px;border-radius:8px;margin-top:8px;max-height:240px;overflow:auto;color:var(--ink)}
+  .empty{color:var(--faint);text-align:center;padding:30px;font-size:13px}
+  .foot{font-size:12px;color:var(--faint);text-align:center;margin-top:40px;line-height:1.8}
+  .foot a{color:var(--sub)}
+  @media(max-width:640px){ .grid{grid-template-columns:1fr} main{padding:32px 16px 60px} }
+</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <h1>会社法 改正チェッカー</h1>
+    <p>前回チェックした日付を指定すると、それ以降に各条文が改正されたかを e-Gov 法令API で一括判定します。サーバー不要、このファイルをブラウザで開くだけで動作します。</p>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div>
+        <span class="label">対象法令</span>
+        <select id="preset">
+          <option value="417AC0000000086">会社法（平成十七年法律第八十六号）</option>
+          <option value="132AC0000000048">商法（明治三十二年法律第四十八号）</option>
+          <option value="__custom">法令IDを手入力</option>
+        </select>
+      </div>
+      <div>
+        <span class="label">前回チェック日（この日より後の改正を検出）</span>
+        <input type="date" id="since">
+      </div>
+    </div>
+    <div class="mt" id="customWrap" style="display:none">
+      <span class="label">法令ID</span>
+      <input type="text" id="lawId" value="417AC0000000086">
+      <div class="hint">e-Gov法令検索のURL末尾のID。例：会社法＝417AC0000000086</div>
+    </div>
+    <div class="mt">
+      <span class="label">チェックする条番号</span>
+      <textarea id="articles" placeholder="2, 309, 331, 362, 847の2">2, 309, 331, 362</textarea>
+      <div class="hint">カンマか改行区切り。「第」「条」は省略可。枝番は「847の2」のように入力。</div>
+    </div>
+    <div class="actions">
+      <button class="btn-primary" id="runBtn">チェック</button>
+      <button class="btn-ghost" id="csvBtn" disabled>CSVで保存</button>
+      <span id="status"></span>
+    </div>
+    <div class="bar" id="bar"><i></i></div>
+  </div>
+
+  <div class="card" id="summaryCard" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div id="upcoming"></div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <table id="resultTable">
+      <thead><tr>
+        <th>条</th><th>見出し</th><th>判定</th><th>更新内容</th><th>現行施行日</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    データ出典：デジタル庁「e-Gov法令API（Version 2）」<br>
+    <a href="https://laws.e-gov.go.jp/" target="_blank" rel="noopener">laws.e-gov.go.jp</a> ／ 参考用。最終確認は官報・原文で行ってください。
+  </div>
+</main>
+
+<script>
+"use strict";
+const API="https://laws.e-gov.go.jp/api/2";
+const CFG="kaishahou_cfg_v2";
+const $=id=>document.getElementById(id);
+
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function cut(s,n){ s=s||""; return s.length>n?s.slice(0,n)+"…":s; }
+
+function toElm(raw){
+  let s=String(raw).trim()
+    .replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-0xFEE0))
+    .replace(/[第条\s]/g,"").replace(/の/g,"_");
+  return s?"Article_"+s:null;
+}
+function elmToLabel(elm){
+  const p=elm.replace("Article_","").split("_");
+  return "第"+p[0]+"条"+(p[1]?("の"+p.slice(1).join("の")):"");
+}
+function nodeText(n){
+  if(n==null) return ""; if(typeof n==="string") return n;
+  let t=""; if(Array.isArray(n.children)) for(const c of n.children) t+=nodeText(c); return t;
+}
+function findCaption(n){
+  if(n==null||typeof n==="string") return "";
+  if(n.tag==="ArticleCaption") return nodeText(n);
+  if(Array.isArray(n.children)) for(const c of n.children){ const r=findCaption(c); if(r) return r; }
+  return "";
+}
+function hashStr(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=(h*0x01000193)>>>0; } return h.toString(16); }
+
+async function fetchJson(url){
+  const res=await fetch(url,{cache:"no-store"});
+  let d=null; try{ d=await res.json(); }catch(e){ throw new Error("応答の解析に失敗"); }
+  if(!res.ok||(d&&d.code&&d.message&&!d.law_full_text)){ throw new Error((d&&d.message)||("HTTP "+res.status)); }
+  return d;
+}
+async function getRevisions(lawId){
+  const d=await fetchJson(`${API}/law_revisions/${lawId}`);
+  const revs=(d.revisions||[]).slice().sort((a,b)=>(b.amendment_enforcement_date||"").localeCompare(a.amendment_enforcement_date||""));
+  return {lawInfo:d.law_info, revs};
+}
+async function getArticle(idOrRev, elm){
+  const d=await fetchJson(`${API}/law_data/${idOrRev}?elm=${encodeURIComponent(elm)}&response_format=json`);
+  const tree=d.law_full_text, text=nodeText(tree);
+  return { revisionId:d.revision_info.law_revision_id, enforcementDate:d.revision_info.amendment_enforcement_date,
+           caption:findCaption(tree), text, hash:hashStr(text) };
+}
+async function pool(items,limit,worker,onP){
+  let i=0,done=0; const out=new Array(items.length);
+  async function run(){ while(i<items.length){ const idx=i++;
+    try{ out[idx]=await worker(items[idx]); }catch(e){ out[idx]={__error:e.message}; }
+    done++; if(onP) onP(done,items.length); } }
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},run));
+  return out;
+}
+
+let lastResults=null;
+
+async function run(){
+  const lawId=$("lawId").value.trim();
+  const since=$("since").value;
+  const elms=$("articles").value.split(/[\n,、，]/).map(toElm).filter(Boolean);
+  if(!lawId){ setStatus("法令IDを入力してください"); return; }
+  if(!since){ setStatus("前回チェック日を選んでください"); return; }
+  if(!elms.length){ setStatus("条番号を入力してください"); return; }
+  saveCfg();
+
+  setBusy(true); setStatus("改正履歴を取得中…");
+  let rd; try{ rd=await getRevisions(lawId); }catch(e){ setStatus("改正履歴の取得に失敗："+e.message); setBusy(false); return; }
+
+  const today=todayStr();
+  const enforced=rd.revs.filter(r=>(r.amendment_enforcement_date||"")<=today); // 新しい順
+  const future=rd.revs.filter(r=>(r.amendment_enforcement_date||"")>today)
+                      .sort((a,b)=>a.amendment_enforcement_date.localeCompare(b.amendment_enforcement_date));
+  renderSummary(rd.lawInfo, enforced, future, since);
+
+  const bar=$("bar"); bar.style.display="block"; bar.firstElementChild.style.width="0%";
+  const results=await pool(elms,4,async(elm)=>{
+    return await checkArticle(lawId, elm, since, enforced);
+  },(done,total)=>{ setStatus("条文を確認中… "+done+"/"+total); bar.firstElementChild.style.width=Math.round(done/total*100)+"%"; });
+
+  lastResults={lawId, since, results};
+  renderResults(results, since);
+  bar.style.display="none";
+  const ch=results.filter(r=>r.changed).length, er=results.filter(r=>r.__error).length;
+  setStatus(`完了 — 更新あり ${ch}件 / 更新なし ${results.length-ch-er}件`+(er?` / エラー ${er}件`:""));
+  $("csvBtn").disabled=false; setBusy(false);
+}
+
+// 指定日(since)以降にその条文が改正されたか判定し、変更イベントを返す
+async function checkArticle(lawId, elm, since, enforced){
+  const cur=await getArticle(lawId, elm); // 現行
+  const row={elm, label:elmToLabel(elm), caption:cur.caption, text:cur.text, enforcementDate:cur.enforcementDate};
+
+  // since 時点の基準リビジョン（since以前で最新の施行）
+  const baseRev=enforced.find(r=>(r.amendment_enforcement_date||"")<=since) || enforced[enforced.length-1];
+  let baseHash;
+  if(!baseRev || baseRev.law_revision_id===cur.revisionId){ baseHash=cur.hash; }
+  else { try{ baseHash=(await getArticle(baseRev.law_revision_id, elm)).hash; }catch(e){ baseHash=null; } }
+
+  if(baseHash===cur.hash){ row.changed=false; return row; }
+  row.changed=true;
+
+  // since より後の施行リビジョン（古い順）を辿り、変わった時点を特定
+  const window=enforced.filter(r=>(r.amendment_enforcement_date||"")>since)
+                       .sort((a,b)=>a.amendment_enforcement_date.localeCompare(b.amendment_enforcement_date));
+  const events=[]; let prev=baseHash;
+  for(const r of window){
+    let h; try{ h=(await getArticle(r.law_revision_id, elm)).hash; }catch(e){ continue; }
+    if(h!==prev){ events.push({date:r.amendment_enforcement_date, title:r.amendment_law_title}); prev=h; }
+  }
+  if(!events.length) events.push({date:cur.enforcementDate, title:"改正あり（詳細は原文をご確認ください）"});
+  row.events=events;
+  return row;
+}
+
+function renderSummary(lawInfo, enforced, future, since){
+  $("summaryCard").style.display="block";
+  const cur=enforced[0];
+  const items=[
+    ["現行施行日", cur?cur.amendment_enforcement_date:"-"],
+    ["前回チェック日", since],
+    ["施行済み改正", enforced.length+"<small> 件</small>"],
+    ["施行待ち改正", future.length+"<small> 件</small>"],
+  ];
+  $("summary").innerHTML=items.map(([k,v])=>`<div class="item"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`).join("");
+  if(future.length){
+    $("upcoming").innerHTML=`<details class="up"><summary>施行待ちの改正 ${future.length}件（先行確認用）</summary><ul>`+
+      future.map(f=>`<li><b>${esc(f.amendment_enforcement_date)}</b> 施行予定 — ${esc(cut(f.amendment_law_title,70))}</li>`).join("")+`</ul></details>`;
+  } else $("upcoming").innerHTML="";
+}
+
+function renderResults(results, since){
+  $("resultCard").style.display="block";
+  const tb=$("resultTable").querySelector("tbody");
+  if(!results.length){ tb.innerHTML=`<tr><td colspan="5" class="empty">該当なし</td></tr>`; return; }
+  tb.innerHTML=results.map(r=>{
+    if(r.__error) return `<tr><td class="art">${esc(r.label||"?")}</td><td colspan="4"><span class="pill pill-err">エラー</span> <span class="muted">${esc(r.__error)}</span></td></tr>`;
+    const judge=r.changed?`<span class="pill pill-changed">更新あり</span>`:`<span class="pill pill-same">更新なし</span>`;
+    let content;
+    if(r.changed&&r.events) content=`<ul class="ev">`+r.events.map(e=>`<li><span class="d">${esc(e.date)}</span> <span class="t">${esc(cut(e.title,42))}</span></li>`).join("")+`</ul>`;
+    else content=`<span class="muted">${esc(since)} 以降の改正なし</span>`;
+    return `<tr>
+      <td class="art">${esc(r.label)}</td>
+      <td class="cap">${esc(r.caption||"")}<details class="body"><summary></summary><pre>${esc((r.text||"").slice(0,1500))}</pre></details></td>
+      <td>${judge}</td>
+      <td>${content}</td>
+      <td>${esc(r.enforcementDate||"-")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function exportCsv(){
+  if(!lastResults) return;
+  const rows=[["条","見出し","判定","更新日","改正法","現行施行日"].join(",")];
+  lastResults.results.forEach(r=>{
+    if(r.__error){ rows.push(csv([r.label,"エラー:"+r.__error,"","","",""])); return; }
+    if(r.changed&&r.events){ r.events.forEach(e=>rows.push(csv([r.label,r.caption||"","更新あり",e.date,e.title,r.enforcementDate||""]))); }
+    else rows.push(csv([r.label,r.caption||"","更新なし","","",r.enforcementDate||""]));
+  });
+  const blob=new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="kaishahou_check_"+todayStr()+".csv"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function csv(arr){ return arr.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(","); }
+
+function setStatus(t){ $("status").textContent=t; }
+function setBusy(b){ $("runBtn").disabled=b; }
+
+function saveCfg(){ localStorage.setItem(CFG,JSON.stringify({lawId:$("lawId").value,preset:$("preset").value,since:$("since").value,articles:$("articles").value})); }
+function loadCfg(){
+  try{ const c=JSON.parse(localStorage.getItem(CFG)); if(c){
+    if(c.lawId)$("lawId").value=c.lawId;
+    if(c.preset){ $("preset").value=c.preset; if(c.preset==="__custom")$("customWrap").style.display="block"; }
+    if(c.since)$("since").value=c.since;
+    if(c.articles)$("articles").value=c.articles;
+  }}catch(e){}
+  if(!$("since").value){ $("since").value=todayStr(); }
+}
+
+$("preset").addEventListener("change",e=>{
+  const v=e.target.value;
+  $("customWrap").style.display=(v==="__custom")?"block":"none";
+  if(v!=="__custom")$("lawId").value=v;
+});
+$("runBtn").addEventListener("click",run);
+$("csvBtn").addEventListener("click",exportCsv);
+loadCfg();
+</script>
+</body>
+</html>

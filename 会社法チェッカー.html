@@ -35,8 +35,10 @@
   .btn-ghost:hover{border-color:var(--ink)}
   button:disabled{opacity:.4;cursor:not-allowed}
   #status{font-size:13px;color:var(--sub);margin-left:auto}
-  .bar{height:2px;background:var(--line);margin-top:18px;border-radius:2px;overflow:hidden;display:none}
-  .bar > i{display:block;height:100%;width:0;background:var(--ink);transition:width .25s}
+  .progress{display:none;align-items:center;gap:12px;margin-top:18px}
+  .progress .track{flex:1;height:14px;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+  .progress .track > i{display:block;height:100%;width:0;background:var(--ink);transition:width .25s}
+  .barpct{flex:0 0 auto;font-size:14px;font-weight:700;min-width:46px;text-align:right;font-variant-numeric:tabular-nums}
   /* law summary */
   .summary{display:flex;gap:28px;flex-wrap:wrap;align-items:baseline}
   .summary .item .k{font-size:11px;color:var(--faint);letter-spacing:.03em}
@@ -129,7 +131,7 @@
       <button class="btn-ghost" id="csvBtn" disabled>CSVで保存</button>
       <span id="status"></span>
     </div>
-    <div class="bar" id="bar"><i></i></div>
+    <div class="progress" id="progress"><div class="track"><i id="barfill"></i></div><span class="barpct" id="barpct">0%</span></div>
   </div>
 
   <div id="out"></div>
@@ -231,7 +233,7 @@ async function run(){
   saveCfg();
 
   setBusy(true); $("out").innerHTML=""; $("csvBtn").disabled=true;
-  const bar=$("bar"); bar.style.display="block"; bar.firstElementChild.style.width="0%";
+  showProgress(true); setProgress(0);
   const today=todayStr();
   const totalArts=targets.reduce((s,t)=>s+t.elms.length,0); let doneArts=0;
   const sections=[];
@@ -249,14 +251,14 @@ async function run(){
     const lawTitle=(rd.revs[0]&&rd.revs[0].law_title)||t.name||t.id;
 
     const results=await pool(t.elms,4,async(elm)=>checkArticle(t.id, elm, since, enforced),
-      ()=>{ doneArts++; setStatus(`条文を確認中… ${doneArts}/${totalArts}`); bar.firstElementChild.style.width=Math.round(doneArts/totalArts*100)+"%"; });
+      ()=>{ doneArts++; setStatus(`条文を確認中… ${doneArts}/${totalArts}`); setProgress(Math.round(doneArts/totalArts*100)); });
 
     sec.querySelector(".lawtitle").innerHTML=`${esc(lawTitle)}<small>${esc(t.id)}</small>`;
     body.innerHTML=buildSummary(enforced,future,since)+buildTable(results,since);
     sections.push({lawId:t.id, lawTitle, since, results});
   }
 
-  lastSections=sections; bar.style.display="none";
+  lastSections=sections; setProgress(100); showProgress(false);
   const all=sections.flatMap(s=>s.results);
   const ch=all.filter(r=>r.changed).length, er=all.filter(r=>r.__error).length;
   setStatus(`完了 — 更新あり ${ch}件 / 更新なし ${all.length-ch-er}件`+(er?` / エラー ${er}件`:""));
@@ -419,6 +421,8 @@ function csv(arr){ return arr.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(
 
 function setStatus(t){ $("status").textContent=t; }
 function setBusy(b){ $("runBtn").disabled=b; }
+function showProgress(b){ $("progress").style.display=b?"flex":"none"; }
+function setProgress(p){ $("barfill").style.width=p+"%"; $("barpct").textContent=p+"%"; }
 
 // プルダウンに載せる法令（IDはe-Gov APIで検証済み）
 const LAWS=[

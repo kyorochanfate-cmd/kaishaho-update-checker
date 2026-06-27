@@ -74,8 +74,8 @@
   .lawblock{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--panel)}
   .lawrow{display:flex;align-items:center;gap:10px}
   .lawrow .lawon{width:auto;flex:0 0 auto}
-  .lawrow .lawname{flex:1 1 auto;font-weight:600}
-  .lawrow .lawid{flex:0 0 180px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--sub)}
+  .lawrow .lawsel{flex:1 1 auto;font-weight:600}
+  .lawrow .lawid{flex:0 0 220px;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--sub)}
   .lawrow .rm{flex:0 0 auto;padding:6px 10px;border-color:var(--line2);background:var(--bg);font-size:13px;line-height:1}
   .lawblock .arts{margin-top:8px;min-height:46px}
   .lawblock.off{opacity:.5}
@@ -210,12 +210,15 @@ async function pool(items,limit,worker,onP){
 let lastSections=null; // [{lawId, lawTitle, since, results}]
 
 function readLawBlocks(){
-  return [...document.querySelectorAll("#laws .lawblock")].map(b=>({
-    on:b.querySelector(".lawon").checked,
-    name:b.querySelector(".lawname").value.trim(),
-    id:b.querySelector(".lawid").value.trim(),
-    arts:b.querySelector(".arts").value,
-  }));
+  return [...document.querySelectorAll("#laws .lawblock")].map(b=>{
+    const sel=b.querySelector(".lawsel"), custom=sel.value==="__custom";
+    return {
+      on:b.querySelector(".lawon").checked,
+      id: custom ? b.querySelector(".lawid").value.trim() : sel.value,
+      name: custom ? "" : sel.options[sel.selectedIndex].text,
+      arts:b.querySelector(".arts").value,
+    };
+  });
 }
 
 async function run(){
@@ -417,26 +420,48 @@ function csv(arr){ return arr.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(
 function setStatus(t){ $("status").textContent=t; }
 function setBusy(b){ $("runBtn").disabled=b; }
 
+// プルダウンに載せる法令（IDはe-Gov APIで検証済み）
+const LAWS=[
+  ["417AC0000000086","会社法"],
+  ["418M60000010012","会社法施行規則"],
+  ["418M60000010013","会社計算規則"],
+  ["417CO0000000364","会社法施行令"],
+  ["418AC0000000048","一般社団法人及び一般財団法人に関する法律"],
+  ["132AC0000000048","商法"],
+  ["338AC0000000125","商業登記法"],
+  ["323AC0000000025","金融商品取引法"],
+  ["413AC0000000075","社債、株式等の振替に関する法律"],
+  ["129AC0000000089","民法"],
+  ["322AC0000000049","労働基準法"],
+];
 const DEFAULT_LAWS=[
-  {on:true, name:"会社法", id:"417AC0000000086", arts:"2, 309, 331, 362"},
-  {on:true, name:"会社法施行規則", id:"418M60000010012", arts:""},
+  {on:true, id:"417AC0000000086", arts:"2, 309, 331, 362"},
+  {on:true, id:"418M60000010012", arts:""},
 ];
 
+function lawOptions(selId){
+  const known=LAWS.some(([id])=>id===selId);
+  return LAWS.map(([id,name])=>`<option value="${id}" ${id===selId?"selected":""}>${esc(name)}</option>`).join("")
+    +`<option value="__custom" ${(selId&&!known)?"selected":""}>その他（法令IDを入力）</option>`;
+}
+
 function addLawBlock(law){
-  law=law||{on:true,name:"",id:"",arts:""};
+  law=law||{on:true,id:LAWS[0][0],arts:""};
+  const custom = law.id && !LAWS.some(([id])=>id===law.id);
   const div=document.createElement("div"); div.className="lawblock"+(law.on?"":" off");
   div.innerHTML=`<div class="lawrow">
       <input type="checkbox" class="lawon" ${law.on?"checked":""} title="チェック対象に含める">
-      <input type="text" class="lawname" placeholder="法令名" value="${esc(law.name||"")}">
-      <input type="text" class="lawid" placeholder="法令ID（例: 417AC0000000086）" value="${esc(law.id||"")}">
+      <select class="lawsel">${lawOptions(law.id||LAWS[0][0])}</select>
+      <input type="text" class="lawid" placeholder="法令ID（例: 417AC0000000086）" value="${esc(custom?law.id:"")}" style="${custom?"":"display:none"}">
       <button type="button" class="rm" title="この法令を削除">×</button>
     </div>
     <textarea class="arts" placeholder="条番号: 2, 309, 331">${esc(law.arts||"")}</textarea>`;
   $("laws").appendChild(div);
-  const onbox=div.querySelector(".lawon");
+  const onbox=div.querySelector(".lawon"), sel=div.querySelector(".lawsel"), idin=div.querySelector(".lawid");
   onbox.addEventListener("change",()=>{ div.classList.toggle("off",!onbox.checked); saveCfg(); });
+  sel.addEventListener("change",()=>{ idin.style.display = sel.value==="__custom" ? "" : "none"; saveCfg(); });
   div.querySelector(".rm").addEventListener("click",()=>{ div.remove(); saveCfg(); });
-  div.querySelectorAll("input,textarea").forEach(el=>el.addEventListener("change",saveCfg));
+  div.querySelectorAll("input,select,textarea").forEach(el=>el.addEventListener("change",saveCfg));
 }
 
 function saveCfg(){ localStorage.setItem(CFG,JSON.stringify({since:$("since").value, laws:readLawBlocks()})); }

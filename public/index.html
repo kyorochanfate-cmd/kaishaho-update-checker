@@ -3,7 +3,65 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>会社法 改正チェッカー</title>
+<title>会社法 改正チェッカー｜条文の更新を前回チェック日から一括確認（無料・e-Gov法令API）</title>
+<meta name="description" content="会社法・会社法施行規則などの指定した条文が、前回チェックした日以降に改正されたかを一括判定。変更箇所を赤緑の差分でハイライト表示します。e-Gov法令APIを使った無料Webツール。アカウント・インストール不要、ブラウザで開くだけ。">
+<meta name="keywords" content="会社法,会社法施行規則,改正,法改正,条文,更新,確認,チェック,e-Gov,法令API,差分,新旧対照,無料,ツール">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://kaishaho-check.pages.dev/">
+<meta name="theme-color" content="#121212">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="会社法 改正チェッカー">
+<meta property="og:title" content="会社法 改正チェッカー｜条文の更新を前回チェック日から一括確認">
+<meta property="og:description" content="指定した条文が前回チェック日以降に改正されたかを一括判定し、変更箇所を差分ハイライト。e-Gov法令APIを使った無料Webツール。インストール不要。">
+<meta property="og:url" content="https://kaishaho-check.pages.dev/">
+<meta property="og:locale" content="ja_JP">
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="会社法 改正チェッカー｜条文の更新を一括確認（無料）">
+<meta name="twitter:description" content="指定条文が前回チェック日以降に改正されたかを一括判定し、変更箇所を差分ハイライト。e-Gov法令API利用の無料Webツール。">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "name": "会社法 改正チェッカー",
+      "url": "https://kaishaho-check.pages.dev/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "JPY" },
+      "inLanguage": "ja",
+      "description": "会社法・会社法施行規則などの指定条文が、前回チェック日以降に改正されたかを一括判定し、変更箇所を差分ハイライト表示する無料Webツール。e-Gov法令APIを利用。"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "会社法や会社法施行規則の改正をまとめて確認できますか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "はい。複数の法令と条番号を登録し、前回チェックした日以降に各条文が改正されたかを1回で一括判定できます。" }
+        },
+        {
+          "@type": "Question",
+          "name": "条文ごとに何が変わったか分かりますか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "前回チェック日時点と現在の条文テキストを比較し、追加・削除された箇所を色付きの差分でハイライト表示します。" }
+        },
+        {
+          "@type": "Question",
+          "name": "料金やインストールは必要ですか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "完全無料です。アカウント登録やインストールは不要で、ブラウザでページを開くだけで利用できます。データはe-Gov法令APIから取得します。" }
+        },
+        {
+          "@type": "Question",
+          "name": "有価証券上場規程もチェックできますか？",
+          "acceptedAnswer": { "@type": "Answer", "text": "できません。有価証券上場規程は東京証券取引所（JPX）の自主規制規程で国の法令ではなく、e-Gov法令APIに収録されていないためです。" }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
   :root{
     --bg:#ffffff; --ink:#121212; --sub:#6b6b6b; --faint:#9a9a9a;

@@ -155,9 +155,14 @@
   .cmpcol{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .cmpcol .cmphead{display:block;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.02em;
      padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
-  .cmpcol .cmpbody{white-space:pre-wrap;font-size:13px;line-height:1.9;padding:12px;max-height:320px;overflow:auto}
-  mark.rm{background:rgba(192,21,47,.12);color:#c0152f;text-decoration:line-through;border-radius:2px;padding:0 1px}
-  mark.add{background:rgba(10,125,63,.14);color:#0a7d3f;text-decoration:none;border-radius:2px;padding:0 1px}
+  .cmpcol .cmpbody{white-space:pre-wrap;font-size:13px;line-height:2.1;padding:12px;max-height:320px;overflow:auto}
+  .cmpcol.haschg-rm{border-color:#e7a0ac}
+  .cmpcol.haschg-add{border-color:#9bcbac}
+  .cmpcount{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;vertical-align:middle}
+  .cmpcount.rm{background:#c0152f;color:#fff}
+  .cmpcount.add{background:#0a7d3f;color:#fff}
+  mark.rm{background:#c0152f;color:#fff;text-decoration:line-through;text-decoration-thickness:2px;border-radius:3px;padding:1px 4px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.add{background:#0a7d3f;color:#fff;text-decoration:none;border-radius:3px;padding:1px 4px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   @media(max-width:720px){ .cmpgrid{grid-template-columns:1fr} }
   .empty{color:var(--faint);text-align:center;padding:30px;font-size:13px}
   .foot{font-size:12px;color:var(--faint);text-align:center;margin-top:40px;line-height:1.8}
@@ -465,12 +470,14 @@ function rowHtml(r, since){
       <td>${content}</td>
       <td>${lastCell}</td>
     </tr>`;
+  const delCount=(r.sideDiff.left.match(/class="rm"/g)||[]).length;
+  const addCount=(r.sideDiff.right.match(/class="add"/g)||[]).length;
   const cmp=`<tr class="cmprow"><td colspan="5">
       <details class="cmp" open>
         <summary>${r.changed?"変更箇所（前回チェック日時点 → 最新）":"条文を比較（前回チェック日時点 → 最新）"}</summary>
         <div class="cmpgrid">
-          <div class="cmpcol"><span class="cmphead">前回チェック日時点（${esc(since)}）</span><div class="cmpbody">${r.sideDiff.left}</div></div>
-          <div class="cmpcol"><span class="cmphead">最新（現行施行日 ${esc(r.enforcementDate||"-")}）</span><div class="cmpbody">${r.sideDiff.right}</div></div>
+          <div class="cmpcol${delCount?" haschg-rm":""}"><span class="cmphead">前回チェック日時点（${esc(since)}）${delCount?`<span class="cmpcount rm">削除 ${delCount}箇所</span>`:""}</span><div class="cmpbody">${r.sideDiff.left}</div></div>
+          <div class="cmpcol${addCount?" haschg-add":""}"><span class="cmphead">最新（現行施行日 ${esc(r.enforcementDate||"-")}）${addCount?`<span class="cmpcount add">追加 ${addCount}箇所</span>`:""}</span><div class="cmpbody">${r.sideDiff.right}</div></div>
         </div>
       </details>
     </td></tr>`;

@@ -155,7 +155,7 @@
   .cmpcol{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .cmpcol .cmphead{display:block;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.02em;
      padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
-  .cmpcol .cmpbody{white-space:pre-wrap;font-size:13px;line-height:2.1;padding:12px;max-height:320px;overflow:auto}
+  .cmpcol .cmpbody{position:relative;white-space:pre-wrap;font-size:13px;line-height:2.1;padding:12px;max-height:320px;overflow:auto}
   .cmpcol.haschg-rm{border-color:#e7a0ac}
   .cmpcol.haschg-add{border-color:#9bcbac}
   .cmpcount{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;vertical-align:middle}
@@ -163,6 +163,16 @@
   .cmpcount.add{background:#0a7d3f;color:#fff}
   mark.rm{background:#c0152f;color:#fff;text-decoration:line-through;text-decoration-thickness:2px;border-radius:3px;padding:1px 4px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   mark.add{background:#0a7d3f;color:#fff;text-decoration:none;border-radius:3px;padding:1px 4px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.mark-focus{outline:3px solid var(--ink);outline-offset:2px}
+  .chgsum{margin:0 0 10px;padding:8px 12px;background:var(--panel);border-left:3px solid var(--ink);border-radius:0 6px 6px 0;font-size:12.5px}
+  .chgnav{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+  .chgnav button{padding:4px 14px;font-size:12px;font-weight:700;border:1px solid var(--line2);background:var(--bg);border-radius:6px;color:var(--ink)}
+  .chgnav button:hover{border-color:var(--ink)}
+  .chgnav .cnt{font-size:12px;font-weight:700;min-width:44px;text-align:center;font-variant-numeric:tabular-nums}
+  .chgnav .navlabel{font-size:11px;color:var(--faint)}
+  .pill-future{background:var(--bg);color:#8a5a00;border:1px solid #d8b46a}
+  details.cmp+details.cmp{margin-top:14px;border-top:1px dashed var(--line2);padding-top:12px}
+  details.cmp.fut summary{color:#8a5a00}
   @media(max-width:720px){ .cmpgrid{grid-template-columns:1fr} }
   .empty{color:var(--faint);text-align:center;padding:30px;font-size:13px}
   .foot{font-size:12px;color:var(--faint);text-align:center;margin-top:40px;line-height:1.8}
@@ -303,7 +313,7 @@ async function run(){
     const future=rd.revs.filter(r=>(r.amendment_enforcement_date||"")>today).sort((a,b)=>a.amendment_enforcement_date.localeCompare(b.amendment_enforcement_date));
     const lawTitle=(rd.revs[0]&&rd.revs[0].law_title)||t.name||t.id;
 
-    const results=await pool(t.elms,4,async(elm)=>checkArticle(t.id, elm, since, enforced),
+    const results=await pool(t.elms,4,async(elm)=>checkArticle(t.id, elm, since, enforced, future),
       ()=>{ doneArts++; setStatus(`条文を確認中… ${doneArts}/${totalArts}`); setProgress(Math.round(doneArts/totalArts*100)); });
 
     sec.querySelector(".lawtitle").innerHTML=`${esc(lawTitle)}<small>${esc(t.id)}</small>`;
@@ -319,7 +329,7 @@ async function run(){
 }
 
 // 指定日(since)以降にその条文が改正されたか判定し、変更イベントを返す
-async function checkArticle(lawId, elm, since, enforced){
+async function checkArticle(lawId, elm, since, enforced, future){
   const cur=await getArticle(lawId, elm); // 現行
   const row={elm, label:elmToLabel(elm), caption:cur.caption, text:cur.text, enforcementDate:cur.enforcementDate};
 
@@ -339,20 +349,33 @@ async function checkArticle(lawId, elm, since, enforced){
 
   // 前回チェック日時点 と 最新 を左右に並べた比較HTML（常に生成。変更なしでも両方表示）
   row.sideDiff=renderSideBySide(baseText, cur.text);
+  row.changed = baseHash!==cur.hash;
 
-  if(baseHash===cur.hash){ row.changed=false; return row; }
-  row.changed=true;
-
-  // since より後の施行リビジョン（古い順）を辿り、変わった時点を特定
-  const window=enforced.filter(r=>(r.amendment_enforcement_date||"")>since)
-                       .sort((a,b)=>a.amendment_enforcement_date.localeCompare(b.amendment_enforcement_date));
-  const events=[]; let prev=baseHash;
-  for(const r of window){
-    let h; try{ h=(await getArticle(r.law_revision_id, elm)).hash; }catch(e){ continue; }
-    if(h!==prev){ events.push({date:r.amendment_enforcement_date, title:r.amendment_law_title}); prev=h; }
+  if(row.changed){
+    row.notes=classifyChange(row.sideDiff);
+    // since より後の施行リビジョン（古い順）を辿り、変わった時点を特定
+    const window=enforced.filter(r=>(r.amendment_enforcement_date||"")>since)
+                         .sort((a,b)=>a.amendment_enforcement_date.localeCompare(b.amendment_enforcement_date));
+    const events=[]; let prev=baseHash;
+    for(const r of window){
+      let h; try{ h=(await getArticle(r.law_revision_id, elm)).hash; }catch(e){ continue; }
+      if(h!==prev){ events.push({date:r.amendment_enforcement_date, title:r.amendment_law_title}); prev=h; }
+    }
+    if(!events.length) events.push({date:cur.enforcementDate, title:"改正あり（詳細は原文をご確認ください）"});
+    row.events=events;
   }
-  if(!events.length) events.push({date:cur.enforcementDate, title:"改正あり（詳細は原文をご確認ください）"});
-  row.events=events;
+
+  // 施行待ちの改正でこの条文が変わる予定があるか（最も早い変更を検出して予告差分を作成）
+  if(future && future.length){
+    for(const fr of future){
+      let fa; try{ fa=await getArticle(fr.law_revision_id, elm); }catch(e){ continue; }
+      if(fa.hash!==cur.hash){
+        const sd=renderSideBySide(cur.text, fa.text);
+        row.futureChange={date:fr.amendment_enforcement_date, title:fr.amendment_law_title, sideDiff:sd, notes:classifyChange(sd)};
+        break;
+      }
+    }
+  }
   return row;
 }
 
@@ -378,12 +401,14 @@ function lcsOps(a,b){
   while(j<m) ops.push({t:"ins",v:b[j++]});
   return ops;
 }
-// 文字単位で削除/追加を左右それぞれに振り分ける
-function diffCharsSide(a,b){
-  if(a.length*b.length>1000000) return {left:`<mark class="rm">${esc(a)}</mark>`, right:`<mark class="add">${esc(b)}</mark>`};
+// 文字単位で削除/追加を左右それぞれに振り分ける（k=変更箇所番号、ジャンプ用に data-chg を付与）
+function diffCharsSide(a,b,k){
+  const delRuns=[],insRuns=[];
+  if(a.length*b.length>1000000){ delRuns.push(a); insRuns.push(b);
+    return {left:`<mark class="rm" data-chg="${k}">${esc(a)}</mark>`, right:`<mark class="add" data-chg="${k}">${esc(b)}</mark>`, delRuns, insRuns}; }
   let left="",right="",bufL="",bufR="",modeL="eq",modeR="eq";
-  const flushL=()=>{ if(!bufL)return; left+= modeL==="del"?`<mark class="rm">${esc(bufL)}</mark>`:esc(bufL); bufL=""; };
-  const flushR=()=>{ if(!bufR)return; right+= modeR==="ins"?`<mark class="add">${esc(bufR)}</mark>`:esc(bufR); bufR=""; };
+  const flushL=()=>{ if(!bufL)return; if(modeL==="del"){ left+=`<mark class="rm" data-chg="${k}">${esc(bufL)}</mark>`; delRuns.push(bufL); } else left+=esc(bufL); bufL=""; };
+  const flushR=()=>{ if(!bufR)return; if(modeR==="ins"){ right+=`<mark class="add" data-chg="${k}">${esc(bufR)}</mark>`; insRuns.push(bufR); } else right+=esc(bufR); bufR=""; };
   for(const o of lcsOps([...a],[...b])){
     if(o.t==="eq"){
       if(modeL!=="eq"){flushL();modeL="eq";} bufL+=o.v;
@@ -395,26 +420,46 @@ function diffCharsSide(a,b){
     }
   }
   flushL(); flushR();
-  return {left,right};
+  return {left,right,delRuns,insRuns};
 }
 // 前回チェック日時点(oldText)と現在(newText)を、左右それぞれハイライト付きHTMLで返す
+// regions=変更箇所の数、delRuns/insRuns=削除・追加された生テキスト（要約用）
 function renderSideBySide(oldText,newText){
-  if(oldText===newText){ const t=esc(newText); return {left:t,right:t}; }
-  if(!oldText) return {left:`<span class="muted">（この時点のデータなし。新設の可能性があります）</span>`, right:`<mark class="add">${esc(newText)}</mark>`};
+  if(oldText===newText){ const t=esc(newText); return {left:t,right:t,delRuns:[],insRuns:[],regions:0}; }
+  if(!oldText) return {left:`<span class="muted">（この時点のデータなし。新設の可能性があります）</span>`, right:`<mark class="add" data-chg="0">${esc(newText)}</mark>`, delRuns:[], insRuns:[newText], regions:1, isNew:true};
   const A=splitUnits(oldText), B=splitUnits(newText);
-  if(A.length*B.length>250000) return diffCharsSide(oldText,newText);
+  if(A.length*B.length>250000){ const s=diffCharsSide(oldText,newText,0); return {...s, regions:1}; }
   const ops=lcsOps(A,B);
-  let left="",right="",i=0;
+  let left="",right="",i=0,k=0; const delRuns=[],insRuns=[];
   while(i<ops.length){
     if(ops[i].t==="eq"){ const t=esc(ops[i].v); left+=t; right+=t; i++; continue; }
     let dels="",inss="";
     while(i<ops.length&&ops[i].t==="del"){ dels+=ops[i].v; i++; }
     while(i<ops.length&&ops[i].t==="ins"){ inss+=ops[i].v; i++; }
-    if(dels&&inss){ const s=diffCharsSide(dels,inss); left+=s.left; right+=s.right; }
-    else if(dels) left+=`<mark class="rm">${esc(dels)}</mark>`;
-    else if(inss) right+=`<mark class="add">${esc(inss)}</mark>`;
+    if(dels&&inss){ const s=diffCharsSide(dels,inss,k); left+=s.left; right+=s.right; delRuns.push(...s.delRuns); insRuns.push(...s.insRuns); }
+    else if(dels){ left+=`<mark class="rm" data-chg="${k}">${esc(dels)}</mark>`; delRuns.push(dels); }
+    else if(inss){ right+=`<mark class="add" data-chg="${k}">${esc(inss)}</mark>`; insRuns.push(inss); }
+    k++;
   }
-  return {left,right};
+  return {left,right,delRuns,insRuns,regions:k};
+}
+// 変更内容を機械的に分類して日本語の要約を返す
+function classifyChange(sd){
+  if(sd.isNew) return ["新設・全文追加（前回チェック日時点にはこの条のデータがありません）"];
+  if(!sd.delRuns.length&&!sd.insRuns.length) return [];
+  const notes=[];
+  const strip=s=>s.replace(/[0-9０-９一二三四五六七八九十百千万第条項号の、。・\s]/g,"");
+  const residue=[...sd.delRuns,...sd.insRuns].map(strip).join("");
+  if(residue===""){
+    notes.push("条・項・号の番号や数字の変更のみ — 引用先のズレ等、形式的な修正の可能性が高い（実質的な内容変更なしの見込み）");
+    return notes;
+  }
+  if(sd.insRuns.some(s=>s.trim()==="削除")) notes.push("号の内容が「削除」に置換 — 当該号の実質的な廃止");
+  const dl=sd.delRuns.join("").length, il=sd.insRuns.join("").length;
+  if(dl&&il) notes.push(`文言の変更 — 削除 約${dl}文字／追加 約${il}文字`);
+  else if(dl) notes.push(`文言の削除 — 約${dl}文字`);
+  else if(il) notes.push(`文言の追加 — 約${il}文字`);
+  return notes;
 }
 
 // 現行から履歴を新しい順にさかのぼり、その条が最後に変わった施行日を返す
@@ -463,36 +508,61 @@ function rowHtml(r, since){
   if(r.changed&&r.events) content=`<ul class="ev">`+r.events.map(e=>`<li><span class="d">${esc(e.date)}</span> <span class="t">${esc(cut(e.title,42))}</span></li>`).join("")+`</ul>`;
   else content=`<span class="muted">${esc(since)} 以降の改正なし</span>`;
   const lastCell=r.lastAmended?`<span class="nowrap">${esc(r.lastAmended.date||"-")}</span>${r.lastAmended.note?`<br><span class="muted">${esc(r.lastAmended.note)}</span>`:""}`:"-";
+  const futPill=r.futureChange?`<div style="margin-top:6px"><span class="pill pill-future">変更予定あり</span><div class="muted nowrap">${esc(r.futureChange.date)} 施行</div></div>`:"";
   const meta=`<tr class="metarow">
       <td class="art">${esc(r.label)}</td>
       <td class="cap">${esc(r.caption||"")}</td>
-      <td>${judge}</td>
+      <td>${judge}${futPill}</td>
       <td>${content}</td>
       <td>${lastCell}</td>
     </tr>`;
-  const delCount=(r.sideDiff.left.match(/class="rm"/g)||[]).length;
-  const addCount=(r.sideDiff.right.match(/class="add"/g)||[]).length;
-  const cmp=`<tr class="cmprow"><td colspan="5">
-      <details class="cmp" open>
-        <summary>${r.changed?"変更箇所（前回チェック日時点 → 最新）":"条文を比較（前回チェック日時点 → 最新）"}</summary>
-        <div class="cmpgrid">
-          <div class="cmpcol${delCount?" haschg-rm":""}"><span class="cmphead">前回チェック日時点（${esc(since)}）${delCount?`<span class="cmpcount rm">削除 ${delCount}箇所</span>`:""}</span><div class="cmpbody">${r.sideDiff.left}</div></div>
-          <div class="cmpcol${addCount?" haschg-add":""}"><span class="cmphead">最新（現行施行日 ${esc(r.enforcementDate||"-")}）${addCount?`<span class="cmpcount add">追加 ${addCount}箇所</span>`:""}</span><div class="cmpbody">${r.sideDiff.right}</div></div>
-        </div>
-      </details>
-    </td></tr>`;
+  let cmp=`<tr class="cmprow"><td colspan="5">`;
+  cmp+=cmpBlock(r.sideDiff,
+    `前回チェック日時点（${esc(since)}）`,
+    `最新（現行施行日 ${esc(r.enforcementDate||"-")}）`,
+    { summary: r.changed?"変更箇所（前回チェック日時点 → 最新）":"条文を比較（前回チェック日時点 → 最新）",
+      notes: r.changed?r.notes:null });
+  if(r.futureChange){
+    cmp+=cmpBlock(r.futureChange.sideDiff,
+      `現行`,
+      `施行後（${esc(r.futureChange.date)} 施行予定）`,
+      { summary:`⚠ 施行待ちの改正による変更予定 — ${esc(r.futureChange.date)} 施行（${esc(cut(r.futureChange.title,40))}）`,
+        notes:r.futureChange.notes, future:true });
+  }
+  cmp+=`</td></tr>`;
   return meta+cmp;
+}
+
+// 左右比較ブロック（要約・変更箇所ジャンプナビ付き）
+function cmpBlock(sd, leftHead, rightHead, o){
+  const delCount=sd.delRuns.length, addCount=sd.insRuns.length;
+  const nav=sd.regions>0?`<div class="chgnav" data-total="${sd.regions}" data-idx="-1">
+      <span class="navlabel">変更箇所へジャンプ</span>
+      <button type="button" class="prev" title="前の変更箇所">◀</button>
+      <span class="cnt">－/${sd.regions}</span>
+      <button type="button" class="next" title="次の変更箇所">▶</button>
+    </div>`:"";
+  const notes=o.notes&&o.notes.length?`<div class="chgsum"><b>変更の概要：</b>${o.notes.map(esc).join("　／　")}</div>`:"";
+  return `<details class="cmp${o.future?" fut":""}" open>
+      <summary>${o.summary}</summary>
+      ${notes}${nav}
+      <div class="cmpgrid">
+        <div class="cmpcol${delCount?" haschg-rm":""}"><span class="cmphead">${leftHead}${delCount?`<span class="cmpcount rm">削除 ${delCount}箇所</span>`:""}</span><div class="cmpbody">${sd.left}</div></div>
+        <div class="cmpcol${addCount?" haschg-add":""}"><span class="cmphead">${rightHead}${addCount?`<span class="cmpcount add">追加 ${addCount}箇所</span>`:""}</span><div class="cmpbody">${sd.right}</div></div>
+      </div>
+    </details>`;
 }
 
 function exportCsv(){
   if(!lastSections) return;
-  const rows=[["法令","条","見出し","判定","更新日","改正法","最終改正日"].join(",")];
+  const rows=[["法令","条","見出し","判定","更新日","改正法","最終改正日","施行待ち変更"].join(",")];
   lastSections.forEach(sec=>{
     sec.results.forEach(r=>{
-      if(r.__error){ rows.push(csv([sec.lawTitle,r.label,"エラー:"+r.__error,"","","",""])); return; }
+      if(r.__error){ rows.push(csv([sec.lawTitle,r.label,"エラー:"+r.__error,"","","","",""])); return; }
       const la=r.lastAmended?(r.lastAmended.date+(r.lastAmended.note?("／"+r.lastAmended.note):"")):"";
-      if(r.changed&&r.events){ r.events.forEach(e=>rows.push(csv([sec.lawTitle,r.label,r.caption||"","更新あり",e.date,e.title,la]))); }
-      else rows.push(csv([sec.lawTitle,r.label,r.caption||"","更新なし","","",la]));
+      const fut=r.futureChange?(r.futureChange.date+" 施行予定"):"なし";
+      if(r.changed&&r.events){ r.events.forEach(e=>rows.push(csv([sec.lawTitle,r.label,r.caption||"","更新あり",e.date,e.title,la,fut]))); }
+      else rows.push(csv([sec.lawTitle,r.label,r.caption||"","更新なし","","",la,fut]));
     });
   });
   const blob=new Blob(["﻿"+rows.join("\r\n")],{type:"text/csv"});
@@ -563,6 +633,24 @@ $("runBtn").addEventListener("click",run);
 $("csvBtn").addEventListener("click",exportCsv);
 $("addLawBtn").addEventListener("click",()=>addLawBlock());
 $("since").addEventListener("change",saveCfg);
+
+// 変更箇所ジャンプ（◀▶で左右の該当マークへ同時スクロール）
+document.addEventListener("click",e=>{
+  const btn=e.target.closest(".chgnav button"); if(!btn) return;
+  const nav=btn.closest(".chgnav"), total=+nav.dataset.total;
+  let idx=+nav.dataset.idx;
+  if(btn.classList.contains("next")) idx=(idx<0||idx>=total-1)?0:idx+1;
+  else idx=(idx<=0)?total-1:idx-1;
+  nav.dataset.idx=idx;
+  nav.querySelector(".cnt").textContent=(idx+1)+"/"+total;
+  const det=nav.closest("details");
+  det.querySelectorAll("mark.mark-focus").forEach(m=>m.classList.remove("mark-focus"));
+  det.querySelectorAll(`mark[data-chg="${idx}"]`).forEach(m=>m.classList.add("mark-focus"));
+  det.querySelectorAll(".cmpbody").forEach(body=>{
+    const m=body.querySelector(`mark[data-chg="${idx}"]`);
+    if(m) body.scrollTo({top:Math.max(0,m.offsetTop-body.clientHeight/2), behavior:"smooth"});
+  });
+});
 loadCfg();
 </script>
 </body>

@@ -402,24 +402,40 @@ function lcsOps(a,b){
   return ops;
 }
 // 文字単位で削除/追加を左右それぞれに振り分ける（k=変更箇所番号、ジャンプ用に data-chg を付与）
-function diffCharsSide(a,b,k){
-  const delRuns=[],insRuns=[];
-  if(a.length*b.length>1000000){ delRuns.push(a); insRuns.push(b);
-    return {left:`<mark class="rm" data-chg="${k}">${esc(a)}</mark>`, right:`<mark class="add" data-chg="${k}">${esc(b)}</mark>`, delRuns, insRuns}; }
-  let left="",right="",bufL="",bufR="",modeL="eq",modeR="eq";
-  const flushL=()=>{ if(!bufL)return; if(modeL==="del"){ left+=`<mark class="rm" data-chg="${k}">${esc(bufL)}</mark>`; delRuns.push(bufL); } else left+=esc(bufL); bufL=""; };
-  const flushR=()=>{ if(!bufR)return; if(modeR==="ins"){ right+=`<mark class="add" data-chg="${k}">${esc(bufR)}</mark>`; insRuns.push(bufR); } else right+=esc(bufR); bufR=""; };
-  for(const o of lcsOps([...a],[...b])){
-    if(o.t==="eq"){
-      if(modeL!=="eq"){flushL();modeL="eq";} bufL+=o.v;
-      if(modeR!=="eq"){flushR();modeR="eq";} bufR+=o.v;
-    } else if(o.t==="del"){
-      if(modeL!=="del"){flushL();modeL="del";} bufL+=o.v;
-    } else {
-      if(modeR!=="ins"){flushR();modeR="ins";} bufR+=o.v;
+// 連続する同種op（del/ins/eq）を1つのランにまとめる
+function toRuns(charOps){
+  const runs=[];
+  for(const o of charOps){
+    const last=runs[runs.length-1];
+    if(last && last.t===o.t) last.v+=o.v; else runs.push({t:o.t,v:o.v});
+  }
+  return runs;
+}
+// 変更(del/ins)に挟まれた短い共通文字（偶然の一致）を、単語全体の置換として扱えるよう吸収する
+// 例:「禁錮」→「拘禁刑」で共通する「禁」だけが素通しにならないようにする
+function cleanupRuns(runs, threshold=2){
+  for(let i=1;i<runs.length-1;i++){
+    const prev=runs[i-1], cur=runs[i], next=runs[i+1];
+    if(cur.t==="eq" && cur.v.length<=threshold && prev.t!=="eq" && next.t!=="eq" && prev.t!==next.t){
+      runs.splice(i,1,{t:prev.t,v:cur.v},{t:next.t,v:cur.v});
     }
   }
-  flushL(); flushR();
+  const merged=[];
+  for(const r of runs){
+    const last=merged[merged.length-1];
+    if(last && last.t===r.t) last.v+=r.v; else merged.push({t:r.t,v:r.v});
+  }
+  return merged;
+}
+function diffCharsSide(a,b,k){
+  if(a.length*b.length>1000000) return {left:`<mark class="rm" data-chg="${k}">${esc(a)}</mark>`, right:`<mark class="add" data-chg="${k}">${esc(b)}</mark>`, delRuns:[a], insRuns:[b]};
+  const runs=cleanupRuns(toRuns(lcsOps([...a],[...b])));
+  let left="",right=""; const delRuns=[],insRuns=[];
+  for(const r of runs){
+    if(r.t==="eq"){ const t=esc(r.v); left+=t; right+=t; }
+    else if(r.t==="del"){ left+=`<mark class="rm" data-chg="${k}">${esc(r.v)}</mark>`; delRuns.push(r.v); }
+    else { right+=`<mark class="add" data-chg="${k}">${esc(r.v)}</mark>`; insRuns.push(r.v); }
+  }
   return {left,right,delRuns,insRuns};
 }
 // 前回チェック日時点(oldText)と現在(newText)を、左右それぞれハイライト付きHTMLで返す

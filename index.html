@@ -144,22 +144,21 @@
   .secstatus{font-size:12px;color:var(--sub);margin-bottom:10px}
   @media(max-width:640px){ .lawrow{flex-wrap:wrap} .lawrow .lawid{flex-basis:100%} }
   .muted{color:var(--faint);font-size:12px}
-  details.body{margin-top:6px}
-  details.body summary{cursor:pointer;font-size:12px;color:var(--faint);list-style:none}
-  details.body summary::-webkit-details-marker{display:none}
-  details.body summary::before{content:"条文を表示"}
-  details.body[open] summary::before{content:"閉じる"}
-  details.body pre{white-space:pre-wrap;font-size:12px;background:var(--panel);border:1px solid var(--line);
-     padding:10px;border-radius:8px;margin-top:8px;max-height:240px;overflow:auto;color:var(--ink)}
-  details.body summary.diffsum::before{content:"変更点を表示"}
-  details.body[open] summary.diffsum::before{content:"閉じる"}
-  .difflegend{font-size:11px;color:var(--faint);margin:8px 0 5px}
-  .difflegend .d{color:#c0152f;text-decoration:line-through}
-  .difflegend .i{color:#0a7d3f}
-  .diffbox{white-space:pre-wrap;font-size:13px;background:var(--panel);border:1px solid var(--line);
-     padding:12px;border-radius:8px;line-height:1.95;max-height:340px;overflow:auto;color:var(--ink)}
-  .diffbox del{color:#c0152f;background:rgba(192,21,47,.10);text-decoration:line-through;border-radius:2px;padding:0 1px}
-  .diffbox ins{color:#0a7d3f;background:rgba(10,125,63,.12);text-decoration:none;border-radius:2px;padding:0 1px}
+  .rtable tr.metarow td{border-bottom:none}
+  .rtable tr.cmprow td{padding-top:0}
+  details.cmp{margin-top:2px}
+  details.cmp summary{cursor:pointer;font-size:12px;color:var(--faint);list-style:none;margin-bottom:8px}
+  details.cmp summary::-webkit-details-marker{display:none}
+  details.cmp summary::before{content:"▾ "}
+  details.cmp:not([open]) summary::before{content:"▸ "}
+  .cmpgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .cmpcol{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .cmpcol .cmphead{display:block;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.02em;
+     padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .cmpcol .cmpbody{white-space:pre-wrap;font-size:13px;line-height:1.9;padding:12px;max-height:320px;overflow:auto}
+  mark.rm{background:rgba(192,21,47,.12);color:#c0152f;text-decoration:line-through;border-radius:2px;padding:0 1px}
+  mark.add{background:rgba(10,125,63,.14);color:#0a7d3f;text-decoration:none;border-radius:2px;padding:0 1px}
+  @media(max-width:720px){ .cmpgrid{grid-template-columns:1fr} }
   .empty{color:var(--faint);text-align:center;padding:30px;font-size:13px}
   .foot{font-size:12px;color:var(--faint);text-align:center;margin-top:40px;line-height:1.8}
   .foot a{color:var(--sub)}
@@ -328,11 +327,16 @@ async function checkArticle(lawId, elm, since, enforced){
   if(baseRev && baseRev.law_revision_id!==cur.revisionId){
     try{ base=await getArticle(baseRev.law_revision_id, elm); }catch(e){ base=null; }
   }
-  const baseHash = base ? base.hash : ((baseRev && baseRev.law_revision_id===cur.revisionId) ? cur.hash : null);
+  let baseText, baseHash;
+  if(base){ baseText=base.text; baseHash=base.hash; }
+  else if(baseRev && baseRev.law_revision_id===cur.revisionId){ baseText=cur.text; baseHash=cur.hash; }
+  else { baseText=""; baseHash=null; } // since時点のデータが取得できない＝新設の可能性
+
+  // 前回チェック日時点 と 最新 を左右に並べた比較HTML（常に生成。変更なしでも両方表示）
+  row.sideDiff=renderSideBySide(baseText, cur.text);
 
   if(baseHash===cur.hash){ row.changed=false; return row; }
   row.changed=true;
-  row.diffHtml=renderDiff(base?base.text:"", cur.text); // since時点 → 現在 の差分
 
   // since より後の施行リビジョン（古い順）を辿り、変わった時点を特定
   const window=enforced.filter(r=>(r.amendment_enforcement_date||"")>since)
@@ -369,30 +373,43 @@ function lcsOps(a,b){
   while(j<m) ops.push({t:"ins",v:b[j++]});
   return ops;
 }
-function diffChars(a,b){
-  if(a.length*b.length>1000000) return `<del>${esc(a)}</del><ins>${esc(b)}</ins>`;
-  let html="",buf="",mode="eq";
-  const flush=()=>{ if(!buf)return; const t=esc(buf); html+= mode==="del"?`<del>${t}</del>`: mode==="ins"?`<ins>${t}</ins>`:t; buf=""; };
-  for(const o of lcsOps([...a],[...b])){ if(o.t!==mode){ flush(); mode=o.t; } buf+=o.v; }
-  flush(); return html;
+// 文字単位で削除/追加を左右それぞれに振り分ける
+function diffCharsSide(a,b){
+  if(a.length*b.length>1000000) return {left:`<mark class="rm">${esc(a)}</mark>`, right:`<mark class="add">${esc(b)}</mark>`};
+  let left="",right="",bufL="",bufR="",modeL="eq",modeR="eq";
+  const flushL=()=>{ if(!bufL)return; left+= modeL==="del"?`<mark class="rm">${esc(bufL)}</mark>`:esc(bufL); bufL=""; };
+  const flushR=()=>{ if(!bufR)return; right+= modeR==="ins"?`<mark class="add">${esc(bufR)}</mark>`:esc(bufR); bufR=""; };
+  for(const o of lcsOps([...a],[...b])){
+    if(o.t==="eq"){
+      if(modeL!=="eq"){flushL();modeL="eq";} bufL+=o.v;
+      if(modeR!=="eq"){flushR();modeR="eq";} bufR+=o.v;
+    } else if(o.t==="del"){
+      if(modeL!=="del"){flushL();modeL="del";} bufL+=o.v;
+    } else {
+      if(modeR!=="ins"){flushR();modeR="ins";} bufR+=o.v;
+    }
+  }
+  flushL(); flushR();
+  return {left,right};
 }
-function renderDiff(oldText,newText){
-  if(oldText===newText) return esc(newText);
-  if(!oldText) return `<ins>${esc(newText)}</ins>`;
+// 前回チェック日時点(oldText)と現在(newText)を、左右それぞれハイライト付きHTMLで返す
+function renderSideBySide(oldText,newText){
+  if(oldText===newText){ const t=esc(newText); return {left:t,right:t}; }
+  if(!oldText) return {left:`<span class="muted">（この時点のデータなし。新設の可能性があります）</span>`, right:`<mark class="add">${esc(newText)}</mark>`};
   const A=splitUnits(oldText), B=splitUnits(newText);
-  if(A.length*B.length>250000) return diffChars(oldText,newText);
+  if(A.length*B.length>250000) return diffCharsSide(oldText,newText);
   const ops=lcsOps(A,B);
-  let html="",i=0;
+  let left="",right="",i=0;
   while(i<ops.length){
-    if(ops[i].t==="eq"){ html+=esc(ops[i].v); i++; continue; }
+    if(ops[i].t==="eq"){ const t=esc(ops[i].v); left+=t; right+=t; i++; continue; }
     let dels="",inss="";
     while(i<ops.length&&ops[i].t==="del"){ dels+=ops[i].v; i++; }
     while(i<ops.length&&ops[i].t==="ins"){ inss+=ops[i].v; i++; }
-    if(dels&&inss) html+=diffChars(dels,inss);
-    else if(dels) html+=`<del>${esc(dels)}</del>`;
-    else if(inss) html+=`<ins>${esc(inss)}</ins>`;
+    if(dels&&inss){ const s=diffCharsSide(dels,inss); left+=s.left; right+=s.right; }
+    else if(dels) left+=`<mark class="rm">${esc(dels)}</mark>`;
+    else if(inss) right+=`<mark class="add">${esc(inss)}</mark>`;
   }
-  return html;
+  return {left,right};
 }
 
 // 現行から履歴を新しい順にさかのぼり、その条が最後に変わった施行日を返す
@@ -440,15 +457,24 @@ function rowHtml(r, since){
   let content;
   if(r.changed&&r.events) content=`<ul class="ev">`+r.events.map(e=>`<li><span class="d">${esc(e.date)}</span> <span class="t">${esc(cut(e.title,42))}</span></li>`).join("")+`</ul>`;
   else content=`<span class="muted">${esc(since)} 以降の改正なし</span>`;
-  return `<tr>
+  const lastCell=r.lastAmended?`<span class="nowrap">${esc(r.lastAmended.date||"-")}</span>${r.lastAmended.note?`<br><span class="muted">${esc(r.lastAmended.note)}</span>`:""}`:"-";
+  const meta=`<tr class="metarow">
       <td class="art">${esc(r.label)}</td>
-      <td class="cap">${esc(r.caption||"")}${(r.changed&&r.diffHtml)
-        ? `<details class="body" open><summary class="diffsum"></summary><div class="difflegend"><span class="d">削除</span> / <span class="i">追加</span>（${esc(since)} 時点 → 現在）</div><div class="diffbox">${r.diffHtml}</div></details>`
-        : `<details class="body"><summary></summary><pre>${esc((r.text||"").slice(0,1500))}</pre></details>`}</td>
+      <td class="cap">${esc(r.caption||"")}</td>
       <td>${judge}</td>
       <td>${content}</td>
-      <td>${r.lastAmended?`<span class="nowrap">${esc(r.lastAmended.date||"-")}</span>${r.lastAmended.note?`<br><span class="muted">${esc(r.lastAmended.note)}</span>`:""}`:"-"}</td>
+      <td>${lastCell}</td>
     </tr>`;
+  const cmp=`<tr class="cmprow"><td colspan="5">
+      <details class="cmp" open>
+        <summary>${r.changed?"変更箇所（前回チェック日時点 → 最新）":"条文を比較（前回チェック日時点 → 最新）"}</summary>
+        <div class="cmpgrid">
+          <div class="cmpcol"><span class="cmphead">前回チェック日時点（${esc(since)}）</span><div class="cmpbody">${r.sideDiff.left}</div></div>
+          <div class="cmpcol"><span class="cmphead">最新（現行施行日 ${esc(r.enforcementDate||"-")}）</span><div class="cmpbody">${r.sideDiff.right}</div></div>
+        </div>
+      </details>
+    </td></tr>`;
+  return meta+cmp;
 }
 
 function exportCsv(){
